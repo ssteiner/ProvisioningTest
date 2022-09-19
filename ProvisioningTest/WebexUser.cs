@@ -11,7 +11,7 @@ namespace ProvisioningTest
 
         internal string Id { get; set; }
 
-        internal List<PhoneNumber> PhoneNumbers { get; set; }
+        internal List<PhoneNumber>? PhoneNumbers { get; set; }
 
     }
 

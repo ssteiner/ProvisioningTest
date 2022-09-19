@@ -12,9 +12,9 @@ namespace ProvisioningTest
 
         internal void RunTest()
         {
-            WebexUser user1 = new WebexUser 
-            { 
-                PhoneNumbers = null 
+            WebexUser user1 = new WebexUser
+            {
+                PhoneNumbers = null
             };
             WebexUser user2 = new WebexUser
             {
@@ -47,6 +47,7 @@ namespace ProvisioningTest
                     new PhoneNumber { Type = PhoneNumberType.Mobile, Value = "1236" }
                 }
             };
+            // If exists previous than update the number to the desired one, otherwise just add the number. If desired number is null delete the previous one if it matches.
 
             ProvisioningOperation op1 = new ProvisioningOperation { PreviousMobileNumber = null, DesiredMobileNumber = "1235" };
             UpdateWebexUser(user1, op1); // updateToBeSentToWebex contains one number of type mobile with value = "1235"
@@ -67,7 +68,7 @@ namespace ProvisioningTest
             UpdateWebexUser(user2, op3); // updateToBeSentToWebex contains two numbers, one of type mobile, with value "1235"
             UpdateWebexUser(user3, op3); // updateToBeSentToWebex contains the existing two numbers, plus a new one of type mobile with value "1235"
             UpdateWebexUser(user4, op3); // updateToBeSentToWebex contains a null number collection
-            UpdateWebexUser(user5, op3); // updateToBeSentToWebex contains two nuumbers: 9988 and a mobile number with value 1235
+            UpdateWebexUser(user5, op3); // updateToBeSentToWebex contains two numbers: 9988 and a mobile number with value 1235
 
             ProvisioningOperation op4 = new ProvisioningOperation { PreviousMobileNumber = "1236", DesiredMobileNumber = null };
             UpdateWebexUser(user1, op4); // updateToBeSentToWebex contains a null number collection
@@ -93,14 +94,79 @@ namespace ProvisioningTest
         /// <param name="op">the data that is in the AUDM database</param>
         internal void UpdateWebexUser(WebexUser user, ProvisioningOperation op)
         {
-            WebexUser updateToBeSentToWebex;
-            WebexUser updateToBeSentToWebexOnRollback;
+            WebexUser updateToBeSentToWebex = new();
+            updateToBeSentToWebex.PhoneNumbers = new();
+            WebexUser updateToBeSentToWebexOnRollback = new();
+            updateToBeSentToWebexOnRollback.PhoneNumbers = new();
 
-            //this method must fill out updateToBeSentToWebex and updateToBeSentToWebexOnRollback;
+            if (op.PreviousMobileNumber == null && op.DesiredMobileNumber == null)
+            {
+                updateToBeSentToWebex.PhoneNumbers = null;
+            }
+            else
+            {
+                var HasPreviousVal = op.PreviousMobileNumber != null;
+                var HasDesiredVal = op.DesiredMobileNumber != null;
+                var foundPrevValNumber = user.PhoneNumbers?.FirstOrDefault(mobileNumber => mobileNumber.Type == PhoneNumberType.Mobile && mobileNumber.Value == op.PreviousMobileNumber);
+                var foundDesValNumber = user.PhoneNumbers?.FirstOrDefault(mobileNumber => mobileNumber.Type == PhoneNumberType.Mobile && mobileNumber.Value == op.DesiredMobileNumber);
+                var HasPreviousValNumberFound = foundPrevValNumber != null;
+                var HasDesiredValNumberFound = foundDesValNumber != null;
+
+                if (HasPreviousValNumberFound && HasDesiredValNumberFound) // number already in place
+                {
+                    updateToBeSentToWebex.PhoneNumbers = null;
+                }
+
+                //Add
+                if (HasDesiredVal && !HasPreviousValNumberFound && !HasDesiredValNumberFound)
+                {
+                    if (user.PhoneNumbers != null)
+                    {
+                        foreach (var item in user.PhoneNumbers)
+                        {
+                            updateToBeSentToWebex.PhoneNumbers.Add(new() { Type = item.Type, Value = item.Value });
+                        }
+                    }
+                    updateToBeSentToWebex.PhoneNumbers.Add(new PhoneNumber() { Type = PhoneNumberType.Mobile, Value = op.DesiredMobileNumber });
+                }
+
+                //Nothing to do
+                if (HasDesiredVal && !HasPreviousValNumberFound && HasDesiredValNumberFound)
+                {
+                    updateToBeSentToWebex.PhoneNumbers = null;
+                }
+
+                //Update
+                if (HasPreviousVal && HasDesiredVal && HasPreviousValNumberFound && !HasDesiredValNumberFound)
+                {
+                    foreach (var item in user.PhoneNumbers)
+                    {
+                        if (!item.Value.Contains(foundPrevValNumber.Value))
+                            updateToBeSentToWebex.PhoneNumbers.Add(new() { Type = item.Type, Value = item.Value });
+                        else
+                            updateToBeSentToWebex.PhoneNumbers.Add(new() { Type = foundPrevValNumber.Type, Value = op.DesiredMobileNumber });
+                    }
+                }
+
+                //Delete or send null
+                if (HasPreviousVal && !HasDesiredVal)
+                {
+                    if (user.PhoneNumbers != null && HasPreviousValNumberFound)
+                    {
+                        foreach (var item in user.PhoneNumbers)
+                        {
+                            if (!item.Value.Contains(foundPrevValNumber.Value))
+                                updateToBeSentToWebex.PhoneNumbers.Add(new() { Type = item.Type, Value = item.Value });
+                        }
+                    }
+                    else
+                        updateToBeSentToWebex.PhoneNumbers = null;
+                }
+
+            }
+            if (updateToBeSentToWebex.PhoneNumbers == null) Console.WriteLine("PhoneNumbers = null");
+            else Console.WriteLine(string.Join('\n', updateToBeSentToWebex.PhoneNumbers.Select(o => $"{o.Value} - {o.Type}")));
+            Console.WriteLine(new String('-', 15));
         }
-
-
-
-
     }
 }
