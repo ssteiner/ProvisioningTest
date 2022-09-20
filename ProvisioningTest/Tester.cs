@@ -99,6 +99,40 @@ namespace ProvisioningTest
             WebexUser updateToBeSentToWebexOnRollback = new();
             updateToBeSentToWebexOnRollback.PhoneNumbers = new();
 
+
+            List<PhoneNumber> existingNumbers = new(user.PhoneNumbers ?? new List<PhoneNumber>());
+            List<PhoneNumber> newNumbers = new();
+
+            var existingNumber = user.PhoneNumbers?.FirstOrDefault(n => n.Type == PhoneNumberType.Mobile && n.Value == op.PreviousMobileNumber);
+            var updateNumbers = false;
+            if (existingNumber != null && op.DesiredMobileNumber != op.PreviousMobileNumber) // number has changed => update existing number
+            {
+                if (!string.IsNullOrEmpty(op.DesiredMobileNumber))
+                {
+                    newNumbers.Add(new PhoneNumber { Type = PhoneNumberType.Mobile, Value = op.DesiredMobileNumber });
+                }
+                existingNumbers.Remove(existingNumber);
+                updateNumbers = true;
+            }
+            else if (op.DesiredMobileNumber != null)
+            {
+                newNumbers.Add(new PhoneNumber { Type = PhoneNumberType.Mobile, Value = op.DesiredMobileNumber });
+                updateNumbers = true;
+            }
+            if (updateNumbers)
+            {
+                foreach (var number in existingNumbers)
+                {
+                    newNumbers.Add(number);
+                }
+                updateToBeSentToWebex.PhoneNumbers = newNumbers;
+                updateToBeSentToWebexOnRollback.PhoneNumbers = user.PhoneNumbers;
+            }
+
+
+
+
+
             if (op.PreviousMobileNumber == null && op.DesiredMobileNumber == null)
             {
                 updateToBeSentToWebex.PhoneNumbers = null;
